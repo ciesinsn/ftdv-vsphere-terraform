@@ -136,6 +136,8 @@ resource "vsphere_virtual_machine" "ftdv" {
   folder                     = var.vm_folder
   num_cpus                   = var.cpu
   memory                     = var.memory_mb
+  firmware                   = "efi"      # Match the Cisco FTDv 10.1 OVF.
+  efi_secure_boot_enabled    = false      # Match the OVF's boot options.
   scsi_type                  = "lsilogic" # Match the controller specified by the Cisco OVF.
   wait_for_guest_net_timeout = 0
   wait_for_guest_ip_timeout  = 0
