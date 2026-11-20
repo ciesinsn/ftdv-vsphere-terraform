@@ -1,0 +1,32 @@
+# Terraform working data, state, plans, crash logs, and variable values
+**/.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.*
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Generated bootstrap media and downloaded Cisco appliance images
+.generated/
+ftdv-image/
+*.iso
+*.ova
+*.ovf
+*.vmdk
+*.mf
+
+# Local caches and editor/OS files
+__pycache__/
+*.py[cod]
+.DS_Store
+.env
+.env.*

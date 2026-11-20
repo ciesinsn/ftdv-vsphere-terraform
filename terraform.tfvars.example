@@ -1,0 +1,77 @@
+# =============================================================
+# LAB ONLY — PLAINTEXT CREDENTIALS. DO NOT COMMIT REAL VALUES.
+# Copy this file to terraform.tfvars and replace the examples.
+# Production: use a secrets manager and inject credentials at runtime.
+# Terraform state, Day-0 config files and ISOs also contain secrets.
+# =============================================================
+
+# vCenter account for VM, NIC, datastore, and ISO operations
+vcenter_server               = "vcenter.lab.example"
+vcenter_username             = "terraform-service@vsphere.local"
+vcenter_password             = "REPLACE_WITH_VCENTER_PASSWORD"
+vcenter_allow_unverified_ssl = false # set true ONLY for a trusted, isolated lab with self-signed certs
+
+# SCC registration provider (enable_scc_onboarding below to use it)
+scc_base_url  = "https://www.security.cisco.com" # replace with your SCC tenant/provider URL
+scc_api_token = "REPLACE_WITH_SCC_API_TOKEN"
+
+# FMC provider for planned private-cloud cluster resource.
+# cdFMC uses a regional URL like https://api.<region>.security.cisco.com/firewall.
+# The cdFMC token may be the same API token as SCC if scoped appropriately.
+fmc_url       = "https://api.<region>.security.cisco.com/firewall"
+fmc_api_token = "REPLACE_WITH_CDFMC_API_TOKEN"
+fmc_insecure  = false
+
+# Rename to terraform.tfvars and customize for your lab.
+datacenter = "DC1"
+cluster    = "Compute-Cluster"
+datastore  = "datastore1"
+host       = "esxi01.lab.example"
+ftdv_ovf_path = "/opt/cisco-ftdv/Cisco_Secure_Firewall_Threat_Defense_Virtual-VI-10.0.0-xxx.ovf"
+
+# IMPORTANT: inspect the real OVF's NetworkSection to get the exact labels,
+# and verify NIC order for the FTDv release. These are LAB EXAMPLE names.
+ovf_network_mapping = {
+  "Management" = "management"
+  "Diagnostic" = "diagnostic"
+  "Inside"     = "inside"
+  "Outside"    = "outside"
+  "CCL"        = "ccl"
+}
+network_roles_order = ["management", "diagnostic", "inside", "outside", "ccl"]
+portgroups = {
+  management = "PG-MGMT"
+  diagnostic = "PG-DIAG"
+  inside     = "PG-INSIDE"
+  outside    = "PG-OUTSIDE"
+  ccl        = "PG-CCL"
+}
+
+desired_nodes       = 2
+name_prefix         = "ftdv-lab"
+management_cidr     = "192.168.10.0/24"
+management_first_host = 11
+management_gateway  = "192.168.10.1"
+dns1                = "192.168.10.5"
+fmc_address         = "192.168.10.10" # manual FMC mode only; SCC uses its generated hostname
+registration_nat_id_prefix = "ftdv-lab"
+
+# LAB ONLY: FTD administrator and optional static registration credentials.
+admin_password   = "REPLACE_WITH_FTD_ADMIN_PASSWORD"
+registration_key = "REPLACE_WITH_FMC_REGISTRATION_KEY"
+# When enable_scc_onboarding=true, generated per-device keys take precedence.
+enable_scc_onboarding = false
+ftd_boot_wait_seconds = 120 # deprecated; SSH readiness check replaces this delay
+ftd_readiness_timeout_seconds = 1800 # maximum wait for management SSH and SCC manager
+scc_access_policy_name = null # REQUIRED when enable_scc_onboarding = true; enter an existing cdFMC policy name
+power_on = false # deprecated and ignored
+
+# Optional settings shown explicitly; null selects the default resource pool/folder.
+scc_performance_tier        = "FTDv30" # choose an entitled virtual license tier
+resource_pool               = null
+vm_folder                   = null
+dns2                        = ""
+cpu                         = 8
+memory_mb                   = 16384
+iso_datastore_folder        = "ftdv-day0"
+acknowledge_vm_removal_risk = false # reserved; currently has no effect

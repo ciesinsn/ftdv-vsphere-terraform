@@ -1,0 +1,33 @@
+#!/usr/bin/expect -f
+# Keep all SSH output private: it may include prompts or device details.
+log_user 0
+set timeout 20
+set known_hosts $env(FTD_KNOWN_HOSTS)
+set address $env(FTD_ADDRESS)
+set username $env(FTD_USERNAME)
+set manager $env(FTD_MANAGER)
+set password_attempted 0
+spawn ssh -tt -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$known_hosts -o GlobalKnownHostsFile=/dev/null -o ConnectTimeout=8 -o NumberOfPasswordPrompts=1 -- $username@$address
+expect {
+    -nocase -re {remote host identification has changed|host key verification failed} { exit 3 }
+    -nocase -re {permission denied|password.*(expired|change)|must change.*password|current.*password:|new.*password:} { exit 2 }
+    -nocase -re {password:} {
+        if {$password_attempted} { exit 2 }
+        set password_attempted 1
+        send -- "$env(FTD_PASSWORD)\r"
+        exp_continue
+    }
+    -re {(?m)(^|\r?\n)>\s*$} { }
+    timeout { exit 1 }
+    eof { exit 1 }
+}
+send -- "show managers\r"
+expect {
+    -re {(?m)(^|\r?\n)>\s*$} {
+        set output $expect_out(buffer)
+        if {[string first [string tolower $manager] [string tolower $output]] >= 0 && [regexp -nocase {Type\s*:\s*Manager} $output]} { exit 0 }
+        exit 1
+    }
+    timeout { exit 1 }
+    eof { exit 1 }
+}
