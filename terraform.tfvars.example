@@ -63,11 +63,21 @@ registration_key = "REPLACE_WITH_FMC_REGISTRATION_KEY"
 enable_scc_onboarding = false
 ftd_boot_wait_seconds = 120 # deprecated; SSH readiness check replaces this delay
 ftd_readiness_timeout_seconds = 1800 # maximum wait for management SSH and SCC manager
+scc_online_timeout_seconds = 1800 # maximum wait for SCC device connectivity to become ONLINE
 scc_access_policy_name = null # REQUIRED when enable_scc_onboarding = true; enter an existing cdFMC policy name
 power_on = false # deprecated and ignored
 
 # Optional settings shown explicitly; null selects the default resource pool/folder.
 scc_performance_tier        = "FTDv30" # choose an entitled virtual license tier
+
+# Private-cloud FTD cluster. Replace example networks and set a secret key before enabling.
+enable_ftd_cluster        = false
+ftd_cluster_name          = "ftdv-cluster"
+ftd_cluster_key           = null
+ftd_cluster_ccl_interface = "Ethernet0/2" # verify this is the FTD interface attached to the CCL port group
+ftd_cluster_vtep_cidr     = "192.0.2.0/27" # example only: replace with the dedicated CCL subnet
+ftd_cluster_vni_cidr      = "198.51.100.0/27" # example only: separate subnet for the VNI overlay
+ftd_cluster_members       = 2 # scale-in: reduce and apply before reducing desired_nodes
 resource_pool               = null
 vm_folder                   = null
 dns2                        = ""

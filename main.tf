@@ -208,12 +208,62 @@ resource "sccfm_ftd_device_onboarding" "device" {
   ftd_uid  = terraform_data.ftd_readiness[each.key].output
 }
 
-# Match the Azure workflow's two-minute post-onboarding settling period.
+# Verify the SCC inventory state after the provider's onboarding transaction.
 resource "terraform_data" "ftd_onboarding_wait" {
   for_each         = var.enable_scc_onboarding ? local.nodes : {}
-  triggers_replace = [sccfm_ftd_device_onboarding.device[each.key].id]
+  triggers_replace = [sccfm_ftd_device_onboarding.device[each.key].id, var.scc_online_timeout_seconds, filesha256("${path.module}/scripts/wait-for-scc-online.py")]
   provisioner "local-exec" {
-    command = "sleep 120"
+    command = "python3 '${path.module}/scripts/wait-for-scc-online.py'"
+    environment = {
+      SCC_BASE_URL   = var.scc_base_url
+      SCC_API_TOKEN  = var.scc_api_token
+      SCC_DEVICE_UID = sccfm_ftd_device.device[each.key].id
+      SCC_TIMEOUT    = tostring(var.scc_online_timeout_seconds)
+    }
+  }
+}
+
+# cdFMC uses different identifiers from SCC; look up registered devices by name.
+data "fmc_device" "cluster_node" {
+  for_each   = var.enable_ftd_cluster ? local.nodes : {}
+  name       = each.key
+  depends_on = [terraform_data.ftd_onboarding_wait]
+}
+
+data "fmc_device_physical_interface" "cluster_control_link" {
+  count     = var.enable_ftd_cluster ? 1 : 0
+  device_id = data.fmc_device.cluster_node[format("%s-%02d", var.name_prefix, 1)].id
+  name      = var.ftd_cluster_ccl_interface
+}
+
+resource "fmc_device_cluster" "ftdv" {
+  count = var.enable_ftd_cluster ? 1 : 0
+
+  name                          = var.ftd_cluster_name
+  cluster_key                   = var.ftd_cluster_key
+  control_node_device_id        = data.fmc_device.cluster_node[format("%s-%02d", var.name_prefix, 1)].id
+  control_node_interface_id     = data.fmc_device_physical_interface.cluster_control_link[0].id
+  control_node_interface_name   = var.ftd_cluster_ccl_interface
+  control_node_interface_type   = data.fmc_device_physical_interface.cluster_control_link[0].type
+  control_node_ccl_prefix       = var.ftd_cluster_vtep_cidr
+  control_node_vni_prefix       = var.ftd_cluster_vni_cidr
+  control_node_ccl_ipv4_address = cidrhost(var.ftd_cluster_vtep_cidr, 1)
+  control_node_priority         = 1
+  data_nodes = [for name in sort(keys(local.nodes)) : {
+    device_id        = data.fmc_device.cluster_node[name].id
+    ccl_ipv4_address = cidrhost(var.ftd_cluster_vtep_cidr, local.nodes[name].ordinal)
+    priority         = local.nodes[name].ordinal
+  } if local.nodes[name].ordinal > 1 && local.nodes[name].ordinal <= var.ftd_cluster_members]
+
+  lifecycle {
+    precondition {
+      condition     = var.enable_scc_onboarding && var.ftd_cluster_members <= var.desired_nodes && var.ftd_cluster_key != null
+      error_message = "Cluster formation requires SCC onboarding, ftd_cluster_key, and ftd_cluster_members no greater than desired_nodes."
+    }
+    precondition {
+      condition     = var.ftd_cluster_vtep_cidr != "192.0.2.0/27" && var.ftd_cluster_vni_cidr != "198.51.100.0/27" && var.ftd_cluster_vtep_cidr != var.ftd_cluster_vni_cidr
+      error_message = "Replace the example VTEP and VNI subnets with separate, usable networks before enabling the cluster."
+    }
   }
 }
 
@@ -222,6 +272,10 @@ output "node_management_ips" {
 }
 output "vm_ids" {
   value = { for name, vm in vsphere_virtual_machine.ftdv : name => vm.id }
+}
+output "ftd_cluster_id" {
+  description = "cdFMC cluster identifier, when cluster management is enabled."
+  value       = try(fmc_device_cluster.ftdv[0].id, null)
 }
 output "day0_iso_datastore_paths" {
   value = { for name, f in vsphere_file.day0_iso : name => f.destination_file }

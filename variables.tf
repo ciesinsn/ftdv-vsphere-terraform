@@ -22,7 +22,7 @@ variable "scc_api_token" {
   sensitive = true
 }
 
-# cdFMC/FMC provider for future cluster membership management.
+# cdFMC/FMC provider for cluster membership management.
 # For cdFMC, fmc_url should be the regional /firewall base URI.
 variable "fmc_url" {
   type = string
@@ -139,6 +139,15 @@ variable "ftd_readiness_timeout_seconds" {
     error_message = "ftd_readiness_timeout_seconds must be a positive integer."
   }
 }
+variable "scc_online_timeout_seconds" {
+  description = "Maximum time to wait for SCC to report the onboarded device online."
+  type        = number
+  default     = 1800
+  validation {
+    condition     = var.scc_online_timeout_seconds >= 1 && floor(var.scc_online_timeout_seconds) == var.scc_online_timeout_seconds
+    error_message = "scc_online_timeout_seconds must be a positive integer."
+  }
+}
 variable "scc_access_policy_name" {
   description = "Existing SCC/FMC access policy for the onboarded devices."
   type        = string
@@ -147,6 +156,58 @@ variable "scc_access_policy_name" {
 variable "scc_performance_tier" {
   type    = string
   default = "FTDv30"
+}
+variable "enable_ftd_cluster" {
+  description = "Create and manage a private-cloud FTDv cluster in cdFMC."
+  type        = bool
+  default     = false
+}
+variable "ftd_cluster_name" {
+  description = "Name for the FTDv cluster in cdFMC."
+  type        = string
+  default     = "ftdv-cluster"
+}
+variable "ftd_cluster_key" {
+  description = "Secret authentication key for cluster control traffic."
+  type        = string
+  sensitive   = true
+  default     = null
+  validation {
+    condition     = var.ftd_cluster_key == null || try(length(var.ftd_cluster_key) >= 1 && length(var.ftd_cluster_key) <= 63, false)
+    error_message = "ftd_cluster_key must contain 1 to 63 characters when set."
+  }
+}
+variable "ftd_cluster_ccl_interface" {
+  description = "FTD interface name attached to the dedicated CCL port group, for example Ethernet0/2; verify on your FTD."
+  type        = string
+  default     = "Ethernet0/2"
+}
+variable "ftd_cluster_vtep_cidr" {
+  description = "Dedicated VTEP/CCL IPv4 subnet, separate from VNI and management networks."
+  type        = string
+  default     = "192.0.2.0/27"
+  validation {
+    condition     = can(cidrhost(var.ftd_cluster_vtep_cidr, 16)) && can(cidrnetmask(var.ftd_cluster_vtep_cidr))
+    error_message = "ftd_cluster_vtep_cidr must be an IPv4 subnet with at least 16 usable host addresses."
+  }
+}
+variable "ftd_cluster_vni_cidr" {
+  description = "Dedicated VNI IPv4 subnet, separate from the VTEP subnet."
+  type        = string
+  default     = "198.51.100.0/27"
+  validation {
+    condition     = can(cidrnetmask(var.ftd_cluster_vni_cidr)) && try(tonumber(split("/", var.ftd_cluster_vni_cidr)[1]) >= 24 && tonumber(split("/", var.ftd_cluster_vni_cidr)[1]) <= 27, false)
+    error_message = "ftd_cluster_vni_cidr must be an IPv4 /24 through /27 subnet."
+  }
+}
+variable "ftd_cluster_members" {
+  description = "Number of existing VMs to include in the cluster. For scale-in, reduce this first and apply before reducing desired_nodes."
+  type        = number
+  default     = 2
+  validation {
+    condition     = var.ftd_cluster_members >= 1 && var.ftd_cluster_members <= 16 && floor(var.ftd_cluster_members) == var.ftd_cluster_members
+    error_message = "ftd_cluster_members must be an integer from 1 to 16."
+  }
 }
 variable "cpu" {
   type    = number

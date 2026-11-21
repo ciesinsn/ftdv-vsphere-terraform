@@ -4,7 +4,7 @@ terraform {
     vsphere = { source = "vmware/vsphere", version = "~> 2.14" }
     local   = { source = "hashicorp/local", version = "~> 2.5" }
     sccfm   = { source = "CiscoDevNet/sccfm", version = "~> 0.5" }
-    fmc     = { source = "CiscoDevNet/fmc", version = "~> 2.2" }
+    fmc     = { source = "CiscoDevNet/fmc", version = ">= 2.8.0, < 3.0.0" }
   }
 }
 
@@ -23,8 +23,7 @@ provider "sccfm" {
   api_token = var.scc_api_token
 }
 
-# cdFMC cluster management provider is configured for the next development phase.
-# No fmc_device_cluster resource exists in this scaffold yet.
+# cdFMC provider manages the private-cloud cluster and its membership.
 provider "fmc" {
   url      = var.fmc_url
   token    = var.fmc_api_token
