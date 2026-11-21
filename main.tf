@@ -168,6 +168,12 @@ resource "vsphere_virtual_machine" "ftdv" {
     path         = vsphere_file.day0_iso[each.key].destination_file
   }
 
+  # The OVF uses ISO transport for vApp properties; the provider requires
+  # a separate client-backed drive in addition to the Day-0 datastore ISO.
+  cdrom {
+    client_device = true
+  }
+
   lifecycle {
     precondition {
       condition     = alltrue([for role in var.network_roles_order : contains(keys(var.portgroups), role)])
