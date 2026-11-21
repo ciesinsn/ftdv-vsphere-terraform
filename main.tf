@@ -262,6 +262,12 @@ resource "fmc_device_cluster" "ftdv" {
   } if local.nodes[name].ordinal > 1 && local.nodes[name].ordinal <= var.ftd_cluster_members]
 
   lifecycle {
+    # The provider cannot change the initial control device. When a new node is
+    # onboarding, Terraform defers all device lookups and otherwise treats the
+    # unknown control ID as a request to replace the whole cluster.
+    # Control-node replacement requires a separate, explicit migration.
+    ignore_changes = [control_node_device_id]
+
     precondition {
       condition     = var.enable_scc_onboarding && var.ftd_cluster_members <= var.desired_nodes && var.ftd_cluster_key != null
       error_message = "Cluster formation requires SCC onboarding, ftd_cluster_key, and ftd_cluster_members no greater than desired_nodes."
