@@ -25,3 +25,11 @@ class DiagnosticTest(unittest.TestCase):
         with patch.object(diagnostic, "variables", return_value={"url": "https://scc.example/path", "token": "secret"}):
             with self.assertRaisesRegex(ValueError, "origin"):
                 diagnostic.main()
+
+    def test_reports_changed_uid_without_device_metadata(self):
+        state = {"values": {"root_module": {"resources": [{"mode": "managed", "type": "sccfm_ftd_device", "values": {"name": "node-3", "id": "old-uid"}}]}}}
+        output = io.StringIO()
+        with patch.object(diagnostic, "variables", return_value={"url": "https://scc.example", "token": "secret"}), patch.object(diagnostic, "terraform_json", return_value=state), patch.object(diagnostic, "request", side_effect=[(200, [{"uid": "new-uid", "metadata": {"regKey": "private-key"}}]), (404, None)]), redirect_stdout(output):
+            diagnostic.main()
+        self.assertIn("UID changed:     True", output.getvalue())
+        self.assertNotIn("private-key", output.getvalue())

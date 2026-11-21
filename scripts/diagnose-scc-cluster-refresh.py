@@ -58,6 +58,10 @@ def main():
         count = len(data) if isinstance(data, list) else "unknown"
         by_uid, _ = request(base, config["token"], "/api/rest/v1/inventory/devices/" + quote(uid, safe=""))
         print(f"{name}: provider name lookup HTTP {status}, matches {count}; inventory UID lookup HTTP {by_uid}")
+        if isinstance(data, list) and len(data) == 1:
+            current_uid = data[0].get("uid")
+            if current_uid:
+                print(f"  stored SCC UID:  {uid}\n  current SCC UID: {current_uid}\n  UID changed:     {current_uid != uid}")
     print("Read-only diagnostic: no infrastructure or Terraform state was changed.")
 
 
