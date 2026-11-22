@@ -1,3 +1,5 @@
+# 1. Discover the existing vSphere infrastructure. Terraform does not create
+# the datacenter, datastore, host, resource pool, or port groups.
 data "vsphere_datacenter" "dc" { name = var.datacenter }
 data "vsphere_datastore" "store" {
   name          = var.datastore
@@ -17,6 +19,8 @@ data "vsphere_network" "portgroup" {
   datacenter_id = data.vsphere_datacenter.dc.id
 }
 
+# 2. Give each node a stable name, ordinal, management IP, and manual NAT ID.
+# The same map keys connect all per-node resources throughout this file.
 locals {
   nodes = {
     for n in range(var.desired_nodes) :
@@ -34,8 +38,9 @@ locals {
   }
 }
 
-# Onboarding based on the same SCCFM resources used in DEVNET-2150 CLUS26.
-# This creates registrations, NOT the private-cloud FMC cluster itself.
+# 3. Create SCC device records. SCC returns a manager hostname and unique
+# registration values; those values are written into each VM’s Day-0 file.
+# This registers the devices for onboarding; it does not create the cluster.
 resource "sccfm_ftd_device" "device" {
   for_each = var.enable_scc_onboarding ? local.nodes : {}
 
@@ -53,6 +58,8 @@ resource "sccfm_ftd_device" "device" {
   }
 }
 
+# 4. Build the first-boot configuration. SCC supplies registration values
+# when enabled; otherwise the manual FMC values are used.
 locals {
   day0_payload = {
     for name, node in local.nodes : name => {
@@ -82,7 +89,8 @@ locals {
   }
 }
 
-# Sensitive data is embedded in these files and in the resulting ISO.
+# Render Day-0 in the order expected by this workshop. This file, the ISO,
+# and Terraform state contain credentials and must be protected.
 resource "local_sensitive_file" "day0" {
   for_each = local.day0_payload
   filename = "${path.module}/.generated/${each.key}/day0-config"
@@ -96,7 +104,8 @@ resource "local_sensitive_file" "day0" {
   file_permission = "0600"
 }
 
-# A local tool is required to produce an ISO; native Terraform doesn't encode ISOs.
+# 5. Package each Day-0 file locally and upload it to the vSphere datastore.
+# Terraform does not build ISO images itself; the helper selects an installed tool.
 resource "terraform_data" "iso" {
   for_each         = local.nodes
   triggers_replace = [local_sensitive_file.day0[each.key].content_sha256]
@@ -122,6 +131,8 @@ resource "vsphere_file" "day0_iso" {
   }
 }
 
+# 6. Deploy one VM per node. NIC order follows the OVF; the two CD-ROMs
+# serve Day-0 configuration and the OVF vApp property transport, respectively.
 resource "vsphere_virtual_machine" "ftdv" {
   for_each                   = local.nodes
   name                       = each.key
@@ -186,7 +197,8 @@ resource "vsphere_virtual_machine" "ftdv" {
   }
 }
 
-# Wait until SSH responds and the FTD has configured its SCC manager.
+# 7. Wait for first boot: SSH must respond and show managers must contain
+# the SCC manager before the onboarding resource starts.
 resource "terraform_data" "ftd_readiness" {
   for_each         = var.enable_scc_onboarding ? local.nodes : {}
   input            = sccfm_ftd_device.device[each.key].id
@@ -205,6 +217,7 @@ resource "terraform_data" "ftd_readiness" {
   }
 }
 
+# Ask SCC to complete onboarding after the FTD manager is configured.
 resource "sccfm_ftd_device_onboarding" "device" {
   for_each = var.enable_scc_onboarding ? local.nodes : {}
   ftd_uid  = terraform_data.ftd_readiness[each.key].output
@@ -225,7 +238,8 @@ resource "terraform_data" "ftd_onboarding_wait" {
   }
 }
 
-# cdFMC uses different identifiers from SCC; look up registered devices by name.
+# 8. Look up the cdFMC device IDs and control-node interface. SCC and cdFMC
+# use different IDs for a device, so SCC IDs cannot be used in this resource.
 data "fmc_device" "cluster_node" {
   for_each   = var.enable_ftd_cluster ? local.nodes : {}
   name       = each.key
@@ -238,6 +252,8 @@ data "fmc_device_physical_interface" "cluster_control_link" {
   name      = var.ftd_cluster_ccl_interface
 }
 
+# 9. Before a membership change, wait for active cdFMC deployments on the
+# intended members. This checks a point in time, not future deployments.
 resource "terraform_data" "cluster_deployment_wait" {
   count = var.enable_ftd_cluster ? 1 : 0
   triggers_replace = [
@@ -257,6 +273,8 @@ resource "terraform_data" "cluster_deployment_wait" {
   }
 }
 
+# 10. Create or update the cluster. Node 01 is the initial control node;
+# ftd_cluster_members selects the numbered nodes that join it.
 resource "fmc_device_cluster" "ftdv" {
   count      = var.enable_ftd_cluster ? 1 : 0
   depends_on = [terraform_data.cluster_deployment_wait]
@@ -295,6 +313,7 @@ resource "fmc_device_cluster" "ftdv" {
   }
 }
 
+# 11. Expose useful identifiers and management addresses after apply.
 output "node_management_ips" {
   value = { for name, node in local.nodes : name => node.mgmt_ip }
 }

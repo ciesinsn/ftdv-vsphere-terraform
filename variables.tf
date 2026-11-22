@@ -46,6 +46,7 @@ variable "fmc_deployment_timeout_seconds" {
   }
 }
 
+# Existing vSphere inventory and OVF networking
 variable "datacenter" {
   type = string
 }
@@ -79,6 +80,7 @@ variable "portgroups" {
   description = "Network role => existing vSphere port group name."
   type        = map(string)
 }
+# Node count, management addressing, and first-boot registration
 variable "desired_nodes" {
   type    = number
   default = 2
@@ -126,6 +128,7 @@ variable "admin_password" {
   type      = string
   sensitive = true
 }
+# SCC onboarding and readiness timeouts
 variable "enable_scc_onboarding" {
   description = "When true, reuse the previous CLUS26 SCC device registration pattern. Requires SCCFM credentials."
   type        = bool
@@ -158,6 +161,7 @@ variable "scc_performance_tier" {
   type    = string
   default = "FTDv30"
 }
+# cdFMC cluster settings and member count
 variable "enable_ftd_cluster" {
   description = "Create and manage a private-cloud FTDv cluster in cdFMC."
   type        = bool
@@ -210,6 +214,7 @@ variable "ftd_cluster_members" {
     error_message = "ftd_cluster_members must be an integer from 1 to 16."
   }
 }
+# VM sizing and datastore placement
 variable "cpu" {
   type    = number
   default = 8

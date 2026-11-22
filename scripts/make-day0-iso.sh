@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Terraform passes SOURCE and OUTPUT through environment variables.
+# Select an available ISO tool and restrict the resulting file permissions.
 set -euo pipefail
 : "${SOURCE:?Set SOURCE to generated day0-config path}"
 : "${OUTPUT:?Set OUTPUT to generated ISO path}"

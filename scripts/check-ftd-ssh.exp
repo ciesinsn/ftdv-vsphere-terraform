@@ -1,4 +1,6 @@
 #!/usr/bin/expect -f
+# Run from wait-for-ftd.py: authenticate over SSH and inspect show managers.
+# Exit codes distinguish retryable startup, authentication, and host-key errors.
 # Keep all SSH output private: it may include prompts or device details.
 log_user 0
 set timeout 20
