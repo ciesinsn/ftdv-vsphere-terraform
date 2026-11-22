@@ -131,15 +131,6 @@ variable "enable_scc_onboarding" {
   type        = bool
   default     = false
 }
-variable "ftd_boot_wait_seconds" {
-  description = "Deprecated and ignored; readiness is checked over SSH instead."
-  type        = number
-  default     = 120
-  validation {
-    condition     = var.ftd_boot_wait_seconds >= 0 && floor(var.ftd_boot_wait_seconds) == var.ftd_boot_wait_seconds
-    error_message = "ftd_boot_wait_seconds must be a non-negative integer."
-  }
-}
 variable "ftd_readiness_timeout_seconds" {
   description = "Maximum time to wait for FTD SSH and SCC manager configuration."
   type        = number
@@ -234,14 +225,4 @@ variable "vm_folder" {
 variable "iso_datastore_folder" {
   type    = string
   default = "ftdv-day0"
-}
-variable "power_on" {
-  description = "Deprecated and ignored; SCC onboarding is controlled by enable_scc_onboarding. This does not control VM power."
-  type        = bool
-  default     = false
-}
-variable "acknowledge_vm_removal_risk" {
-  type        = bool
-  default     = false
-  description = "Reserved for future scale-in controls; currently has no effect."
 }
