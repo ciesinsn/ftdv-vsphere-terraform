@@ -10,6 +10,42 @@ from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 
 
+def page_next_offset(items, paging, offset, requested_limit):
+    """Return the next offset, or None for a complete response."""
+    if paging is None:
+        if len(items) >= requested_limit:
+            raise ValueError("Missing pagination metadata in cdFMC response")
+        return None
+    if not isinstance(paging, dict):
+        raise ValueError("Invalid cdFMC pagination metadata")
+
+    def number(value, name):
+        if isinstance(value, str) and value.isdecimal():
+            value = int(value)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"Invalid cdFMC pagination {name}: {value!r}")
+        return value
+
+    count = paging.get("count")
+    if count is not None:
+        count = number(count, "count")
+        if not items and count > offset:
+            raise ValueError("Incomplete cdFMC paginated response")
+        if offset + len(items) >= count:
+            return None
+
+    actual_limit = number(paging.get("limit", requested_limit), "limit")
+    if actual_limit == 0:
+        if not items and (count is None or count == 0):
+            return None
+        raise ValueError("cdFMC returned a zero page size with items or remaining results")
+    if count is None and len(items) < actual_limit:
+        return None
+    if not items:
+        raise ValueError("Incomplete cdFMC paginated response")
+    return offset + len(items)
+
+
 def main():
     base = os.environ["FMC_URL"].rstrip("/")
     parsed = urlsplit(base)
@@ -44,27 +80,10 @@ def main():
             if not isinstance(items, list):
                 raise ValueError("Unexpected cdFMC API items")
             yield from items
-            paging = data.get("paging")
-            if paging is None:
-                if len(items) >= limit:
-                    raise ValueError("Missing pagination metadata in cdFMC response")
+            next_offset = page_next_offset(items, data.get("paging"), offset, limit)
+            if next_offset is None:
                 break
-            if not isinstance(paging, dict):
-                raise ValueError("Invalid cdFMC pagination metadata")
-            actual_limit = paging.get("limit", limit)
-            count = paging.get("count")
-            if not isinstance(actual_limit, int) or actual_limit <= 0:
-                raise ValueError("Invalid cdFMC page size")
-            if count is not None:
-                if not isinstance(count, int) or count < 0:
-                    raise ValueError("Invalid cdFMC item count")
-                if offset + len(items) >= count:
-                    break
-            elif len(items) < actual_limit:
-                break
-            if not items:
-                raise ValueError("Incomplete cdFMC paginated response")
-            offset += len(items)
+            offset = next_offset
 
     last = None
     while time.monotonic() < deadline:
