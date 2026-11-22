@@ -36,6 +36,16 @@ variable "fmc_insecure" {
   default = false
 }
 
+variable "fmc_deployment_timeout_seconds" {
+  description = "Maximum time to wait for cdFMC deployments to finish before a cluster membership change."
+  type        = number
+  default     = 1800
+  validation {
+    condition     = var.fmc_deployment_timeout_seconds > 0 && floor(var.fmc_deployment_timeout_seconds) == var.fmc_deployment_timeout_seconds
+    error_message = "fmc_deployment_timeout_seconds must be a positive integer."
+  }
+}
+
 variable "datacenter" {
   type = string
 }

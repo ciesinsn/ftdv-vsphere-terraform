@@ -242,8 +242,28 @@ data "fmc_device_physical_interface" "cluster_control_link" {
   name      = var.ftd_cluster_ccl_interface
 }
 
-resource "fmc_device_cluster" "ftdv" {
+resource "terraform_data" "cluster_deployment_wait" {
   count = var.enable_ftd_cluster ? 1 : 0
+  triggers_replace = [
+    jsonencode({ for name, node in local.nodes : name => data.fmc_device.cluster_node[name].id if node.ordinal <= var.ftd_cluster_members }),
+    var.fmc_deployment_timeout_seconds,
+    filesha256("${path.module}/scripts/wait-for-fmc-deployment.py"),
+  ]
+  provisioner "local-exec" {
+    command = "python3 '${path.module}/scripts/wait-for-fmc-deployment.py'"
+    environment = {
+      FMC_URL        = var.fmc_url
+      FMC_TOKEN      = var.fmc_api_token
+      FMC_INSECURE   = tostring(var.fmc_insecure)
+      FMC_DEVICE_IDS = jsonencode([for name, node in local.nodes : data.fmc_device.cluster_node[name].id if node.ordinal <= var.ftd_cluster_members])
+      FMC_TIMEOUT    = tostring(var.fmc_deployment_timeout_seconds)
+    }
+  }
+}
+
+resource "fmc_device_cluster" "ftdv" {
+  count      = var.enable_ftd_cluster ? 1 : 0
+  depends_on = [terraform_data.cluster_deployment_wait]
 
   name                          = var.ftd_cluster_name
   cluster_key                   = var.ftd_cluster_key
